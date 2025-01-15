@@ -56,13 +56,15 @@ def filter_record(record, args, bed_regions):
         if sample['DP'] is not None and sample['DP'] >= args.dp:
             # Check if the sample passes the SNPDP filter
             if 'AD' in sample and sample['AD']:
-                alt_reads = sum(sample['AD'][1:])  # Sum all alternate allele reads
-                if alt_reads >= args.snpdp:
-                    # Check if the sample passes the GT and AF filters
-                    gt_tuple = tuple(sample['GT'])
-                    if gt_tuple == (1, 0) or gt_tuple == (0, 1) or gt_tuple == (1, 1):
-                        if sample['AF'] is not None and sample['AF'] >= args.af:
-                            return True
+                # Ensure AD is not None and contains valid data
+                if sample['AD'] is not None and all(allele is not None for allele in sample['AD']):
+                    alt_reads = sum(sample['AD'][1:])  # Sum all alternate allele reads
+                    if alt_reads >= args.snpdp:
+                        # Check if the sample passes the GT and AF filters
+                        gt_tuple = tuple(sample['GT'])
+                        if gt_tuple == (1, 0) or gt_tuple == (0, 1) or gt_tuple == (1, 1):
+                            if sample['AF'] is not None and sample['AF'] >= args.af:
+                                return True
     return False
 
 def main():
