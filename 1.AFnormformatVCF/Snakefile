@@ -1,0 +1,63 @@
+##snakemake-multivcf
+import pandas as pd
+units = pd.read_table("units.tsv", dtype=str, header=0, delim_whitespace=True).set_index(["sample"], drop=False)
+
+def get_bams(wildcards):
+
+    bams = units.loc[units['sample'] == wildcards.sample, ["bam"]].dropna(axis=1)
+    bams_list = bams.values.tolist()
+
+    return bams_list[0]
+
+rule all:
+    input:
+        "AFmergenormformat.vcf.gz"
+
+# bcftools to create mpileup, call, norm
+rule variant_call:
+    input:
+       bam = get_bams
+    output:
+        "vcfs/{sample}-format.vcf"
+    shell:
+        "bcftools mpileup --annotate FORMAT/AD,FORMAT/DP -f /data/stonelab/references/MTB_ancestor/MTB_ancestor.fasta {input.bam} | bcftools call --multiallelic-caller -Ov > {output}"
+
+# Define the rule to create output2.txt from input2.txt
+rule norm:
+    input:
+        "vcfs/{sample}-format.vcf"
+    output:
+        "vcfs/{sample}-norm-format.vcf"
+    shell:
+        "bcftools norm -f /data/stonelab/references/MTB_ancestor/MTB_ancestor.fasta {input} > {output}"
+
+rule bgzip:
+    input:
+        "vcfs/{sample}-norm-format.vcf"
+    output:
+        index="vcfs/{sample}-norm-format.vcf.gz"
+    shell:
+        "bcftools view -Oz -o {output.index} {input} && bcftools index {output.index}"
+
+rule merge:
+     input:
+         vcf=expand("vcfs/{sample}-norm-format.vcf.gz", sample = units.index.tolist())
+     output:
+         "merge-norm-format.vcf.gz"
+     shell:
+         "bcftools merge -m all -o {output} {input.vcf}"
+
+ # Define the rule to create output2.txt from input2.txt
+rule calculate_AF:
+     input:
+         "merge-norm-format.vcf.gz"
+     output:
+         "AFmergenormformat.vcf.gz"
+     shell:
+         "python AlleleFreq.py {input} {output}"
+
+
+
+
+
+
