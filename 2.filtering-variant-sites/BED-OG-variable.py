@@ -3,14 +3,15 @@ import pysam
 
 def parse_args():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Filter VCF file based on DP, SNPDP, AF, and GT')
+    parser = argparse.ArgumentParser(description='Filter VCF file based on DP, AF, GT, SNP type, and SNP depth')
     parser.add_argument('vcf_file', help='input VCF file')
     parser.add_argument('-s', '--sample', help='comma-separated list of sample names to filter')
-    parser.add_argument('-d', '--dp', type=int, required=True, help='minimum overall read depth (DP) to retain a variant')
-    parser.add_argument('-n', '--snpdp', type=int, required=True, help='minimum reads supporting the SNP (AD) to retain a variant')
+    parser.add_argument('-d', '--dp', type=int, required=True, help='minimum read depth (DP) to retain a variant')
+    parser.add_argument('-n', '--snpdp', type=int, required=True, help='minimum SNP depth (alternate allele depth in AD) to retain a variant')
     parser.add_argument('-a', '--af', type=float, required=True, help='minimum allele frequency (AF) to retain a variant')
     parser.add_argument('-b', '--bed', help='input BED file to specify regions to filter')
     parser.add_argument('-o', '--output', required=True, help='output VCF file')
+    parser.add_argument('-v', '--snp', action='store_true', help='only include SNPs (exclude indels)')
     args = parser.parse_args()
 
     # If sample names are provided, split comma-separated sample names into a list
@@ -31,7 +32,15 @@ def load_bed_regions(bed_file):
                 bed_regions.add((chrom, position))
     return bed_regions
 
+def is_snp(record):
+    # Check if the record is a SNP (not an indel)
+    return 'INDEL' not in record.info
+
 def filter_record(record, args, bed_regions):
+    # Filter out indels if --snp is specified
+    if args.snp and not is_snp(record):
+        return False
+
     # Check if the variant's position is in the BED regions
     if bed_regions and (record.chrom, record.pos) not in bed_regions:
         return False
@@ -45,7 +54,7 @@ def filter_record(record, args, bed_regions):
         
         # Check if the sample passes the DP filter
         if sample['DP'] is not None and sample['DP'] >= args.dp:
-            # Check if the sample passes the AD (snpdp) filter
+            # Check if the sample passes the SNPDP filter
             if 'AD' in sample and sample['AD']:
                 alt_reads = sum(sample['AD'][1:])  # Sum all alternate allele reads
                 if alt_reads >= args.snpdp:
