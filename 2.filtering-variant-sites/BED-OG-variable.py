@@ -3,10 +3,11 @@ import pysam
 
 def parse_args():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Filter VCF file based on DP, AF, and GT')
+    parser = argparse.ArgumentParser(description='Filter VCF file based on DP, SNPDP, AF, and GT')
     parser.add_argument('vcf_file', help='input VCF file')
     parser.add_argument('-s', '--sample', help='comma-separated list of sample names to filter')
-    parser.add_argument('-d', '--dp', type=int, required=True, help='minimum read depth (DP) to retain a variant')
+    parser.add_argument('-d', '--dp', type=int, required=True, help='minimum overall read depth (DP) to retain a variant')
+    parser.add_argument('-n', '--snpdp', type=int, required=True, help='minimum reads supporting the SNP (AD) to retain a variant')
     parser.add_argument('-a', '--af', type=float, required=True, help='minimum allele frequency (AF) to retain a variant')
     parser.add_argument('-b', '--bed', help='input BED file to specify regions to filter')
     parser.add_argument('-o', '--output', required=True, help='output VCF file')
@@ -32,7 +33,7 @@ def load_bed_regions(bed_file):
 
 def filter_record(record, args, bed_regions):
     # Check if the variant's position is in the BED regions
-    if (record.chrom, record.pos) in bed_regions:
+    if bed_regions and (record.chrom, record.pos) not in bed_regions:
         return False
 
     # Loop through all samples in the record
@@ -41,13 +42,18 @@ def filter_record(record, args, bed_regions):
         if sample_name in args.sample:
             continue
         sample = record.samples[sample_name]
-        # Check if the sample passes the DP and AF filters
+        
+        # Check if the sample passes the DP filter
         if sample['DP'] is not None and sample['DP'] >= args.dp:
-            # Check if the sample passes the GT filter
-            gt_tuple = tuple(sample['GT'])
-            if gt_tuple == (1, 0) or gt_tuple == (0, 1) or gt_tuple == (1, 1):
-                if sample['AF'] is not None and sample['AF'] >= args.af:
-                    return True
+            # Check if the sample passes the AD (snpdp) filter
+            if 'AD' in sample and sample['AD']:
+                alt_reads = sum(sample['AD'][1:])  # Sum all alternate allele reads
+                if alt_reads >= args.snpdp:
+                    # Check if the sample passes the GT and AF filters
+                    gt_tuple = tuple(sample['GT'])
+                    if gt_tuple == (1, 0) or gt_tuple == (0, 1) or gt_tuple == (1, 1):
+                        if sample['AF'] is not None and sample['AF'] >= args.af:
+                            return True
     return False
 
 def main():
@@ -73,4 +79,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
