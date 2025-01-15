@@ -4,6 +4,12 @@ This pipeline produces a **multivcf** file and adds a custom field called `[AF]`
 ---
 
 ### 2. Python Script for Filtering Multivcf Output
+
+Parses multivcf and outputs only variant sites as defined by user options.
+**Important**: if one sample passes the criteria, all sample records are kept, even if they do not themselves pass the filters. 
+
+May add functionality to convert these "failures" to N/As?
+
 Use the following Python script to filter the output:
 
 ```bash
