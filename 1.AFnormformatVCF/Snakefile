@@ -20,7 +20,7 @@ rule variant_call:
     output:
         "vcfs/{sample}-format.vcf"
     shell:
-        "bcftools mpileup --annotate FORMAT/AD,FORMAT/DP -f /data/stonelab/references/MTB_ancestor/MTB_ancestor.fasta {input.bam} | bcftools call --multiallelic-caller -Ov > {output}"
+        "bcftools mpileup -B --annotate FORMAT/AD,FORMAT/DP -f /data/stonelab/references/MTB_ancestor/MTB_ancestor.fasta {input.bam} | bcftools call --multiallelic-caller -Ov > {output}"
 
 # Define the rule to create output2.txt from input2.txt
 rule norm:
