@@ -76,7 +76,7 @@ def write_output(output_file, results, min_af, homo_af, min_depth, min_allele_de
         # Add a summary of the allele frequency thresholds and SNP depth used
         out.write(f"\nAllele frequency thresholds used:\n")
         out.write(f"SNP AF >= {min_af:.4f}, Homozygous SNP AF >= {homo_af:.4f}, Heterozygous SNP {min_af:.4f} <= AF < {homo_af:.4f}\n")
-        out.write(f"SNP Depth used: {min_depth}, Minimum Allele Depth used: {min_allele_depth}\n")
+        out.write(f"Read Depth used: {min_depth}, Minimum Allele Depth used: {min_allele_depth}\n")
 
 
 def write_sample_snp_details(sample_data, output_folder):
