@@ -1,27 +1,35 @@
+#!/usr/bin/env python
+
 import pysam
 import argparse
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 
-def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, deletion_threshold=None):
-    records = []
+def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, deletion_threshold=None, no_debug=False):
+    """
+    Convert a multi-sample VCF file into a SNP alignment FASTA.
+    Optional deletion filtering and debug output.
+    """
 
-    # Open the VCF file
+    sample_sequences = {}
+    debug_entries = []
+
+    # Open VCF
     with pysam.VariantFile(vcf_file, 'r') as vcf:
         samples = list(vcf.header.samples)
         sample_sequences = {sample: [] for sample in samples}
-        debug_entries = []  # store debug info in memory
+        site_positions = []
 
         for record in vcf:
             ref_allele = record.ref
             alt_alleles = record.alts
 
-            # Skip indels
+            # Skip INDELs
             if len(ref_allele) > 1 or any(len(alt) > 1 for alt in alt_alleles):
                 continue
 
-            site_calls = {}  # store calls for each sample at this site
+            site_calls = {}
 
             for sample in samples:
                 if sample in record.samples:
@@ -57,7 +65,7 @@ def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, de
                 sample_sequences[sample].append(base)
                 site_calls[sample] = (base, genotype, af, dp)
 
-            # save debug entries for this site
+            # Store debug entries
             for sample in samples:
                 base, genotype, af, dp = site_calls[sample]
                 debug_entries.append(
@@ -65,34 +73,27 @@ def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, de
                     f"Genotype: {genotype}, Allele Frequency: {af}, Depth: {dp}"
                 )
 
-    # Apply deletion filtering if requested
+            site_positions.append(record.pos)
+
+    # Deletion filtering
     if deletion_threshold is not None:
+        num_samples = len(samples)
         keep_sites = []
         num_sites = len(next(iter(sample_sequences.values())))
-        num_samples = len(samples)
         for i in range(num_sites):
             non_missing = sum(seq[i] != 'N' for seq in sample_sequences.values())
             if non_missing / num_samples >= deletion_threshold:
                 keep_sites.append(i)
 
-        # filter sequences
+        # Filter sequences
         for sample in samples:
-            sample_sequences[sample] = ''.join(sample_sequences[sample][i] for i in keep_sites)
+            sample_sequences[sample] = [sample_sequences[sample][i] for i in keep_sites]
 
-        # filter debug entries
-        filtered_debug = []
-        site_index = 0
-        for entry in debug_entries:
-            if f"POS:" in entry:
-                if site_index in keep_sites:
-                    filtered_debug.append(entry)
-                if "Sample:" in entry:
-                    pass
-            site_index += 0  # site_index already tracked above
-        debug_entries = [entry for idx, entry in enumerate(debug_entries)
-                         if (idx // len(samples)) in keep_sites]
+        # Filter debug entries
+        kept_positions = {site_positions[i] for i in keep_sites}
+        debug_entries = [entry for entry in debug_entries if f"POS: {entry.split('POS: ')[1].split(',')[0]}" in map(str, kept_positions)]
 
-    # Create SeqRecord objects
+    # Build SeqRecords
     records = [SeqRecord(Seq(''.join(sample_sequences[sample])),
                          id=sample, description="") for sample in samples]
 
@@ -100,13 +101,27 @@ def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, de
     with open(fasta_output, 'w') as output_file:
         SeqIO.write(records, output_file, "fasta")
 
-    # Write debug file (with total SNP count at top)
+    # Total SNPs in final alignment
     total_snps = len(records[0].seq) if records else 0
-    debug_file = fasta_output + ".debug.txt"
-    with open(debug_file, 'w') as df:
-        df.write(f"Total SNPs in final alignment: {total_snps}\n")
-        for line in debug_entries:
-            df.write(line + "\n")
+
+    if not no_debug:
+        # Write full debug file
+        debug_file = fasta_output + ".debug.txt"
+        with open(debug_file, 'w') as df:
+            df.write(f"Total SNPs in final alignment: {total_snps}\n")
+            for line in debug_entries:
+                df.write(line + "\n")
+    else:
+        # Write a small summary file
+        summary_file = fasta_output + ".stats.txt"
+        with open(summary_file, 'w') as sf:
+            sf.write(f"Total SNPs in final alignment: {total_snps}\n")
+            sf.write(f"Number of samples: {len(samples)}\n")
+
+        # Also print to console
+        print(f"Total SNPs in final alignment: {total_snps}")
+        print(f"Number of samples: {len(samples)}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert VCF to SNP alignment FASTA.")
@@ -117,6 +132,8 @@ if __name__ == "__main__":
     parser.add_argument("--depth", type=int, default=10, help="Minimum depth threshold")
     parser.add_argument("--deletion", type=float, default=None,
                         help="Optional filter: drop sites with fewer than this proportion of non-missing calls")
+    parser.add_argument("--no-debug", action='store_true', help="Do not write full debug file; write only summary stats and print to console")
+
     args = parser.parse_args()
 
-    vcf_to_alignment(args.vcf, args.output, args.min_af, args.max_af, args.depth, args.deletion)
+    vcf_to_alignment(args.vcf, args.output, args.min_af, args.max_af, args.depth, args.deletion, args.no_debug)
