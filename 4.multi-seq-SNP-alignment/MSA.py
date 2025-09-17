@@ -9,19 +9,24 @@ from Bio.Seq import Seq
 def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, deletion_threshold=None, no_debug=False):
     """
     Convert a multi-sample VCF file into a SNP alignment FASTA.
-    Optional deletion filtering and debug output.
+    Applies optional deletion filtering during parsing (not after).
     """
-
-    sample_sequences = {}
-    debug_entries = []
 
     # Open VCF
     with pysam.VariantFile(vcf_file, 'r') as vcf:
         samples = list(vcf.header.samples)
         sample_sequences = {sample: [] for sample in samples}
-        site_positions = []
+        total_snps = 0
 
-        for record in vcf:
+        # Debug/summary file
+        debug_file = None
+        summary_file = None
+        if not no_debug:
+            debug_file = open(fasta_output + ".debug.txt", 'w')
+        else:
+            summary_file = open(fasta_output + ".stats.txt", 'w')
+
+        for idx, record in enumerate(vcf):
             ref_allele = record.ref
             alt_alleles = record.alts
 
@@ -30,6 +35,7 @@ def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, de
                 continue
 
             site_calls = {}
+            non_missing = 0
 
             for sample in samples:
                 if sample in record.samples:
@@ -62,65 +68,47 @@ def vcf_to_alignment(vcf_file, fasta_output, min_af, max_af, depth_threshold, de
                 else:
                     base = 'N'
 
-                sample_sequences[sample].append(base)
+                if base != 'N':
+                    non_missing += 1
+
                 site_calls[sample] = (base, genotype, af, dp)
 
-            # Store debug entries
+            # Apply deletion filter immediately
+            if deletion_threshold is not None:
+                if non_missing / len(samples) < deletion_threshold:
+                    continue  # Skip this site
+
+            # Keep this site
+            total_snps += 1
             for sample in samples:
                 base, genotype, af, dp = site_calls[sample]
-                debug_entries.append(
-                    f"POS: {record.pos}, Sample: {sample}, Added to Alignment: {base}, "
-                    f"Genotype: {genotype}, Allele Frequency: {af}, Depth: {dp}"
-                )
+                sample_sequences[sample].append(base)
 
-            site_positions.append(record.pos)
+                if not no_debug:
+                    debug_file.write(
+                        f"POS: {record.pos}, Sample: {sample}, Added to Alignment: {base}, "
+                        f"Genotype: {genotype}, Allele Frequency: {af}, Depth: {dp}\n"
+                    )
 
-    # Deletion filtering
-    if deletion_threshold is not None:
-        num_samples = len(samples)
-        keep_sites = []
-        num_sites = len(next(iter(sample_sequences.values())))
-        for i in range(num_sites):
-            non_missing = sum(seq[i] != 'N' for seq in sample_sequences.values())
-            if non_missing / num_samples >= deletion_threshold:
-                keep_sites.append(i)
+        # Build SeqRecords
+        records = [SeqRecord(Seq(''.join(sample_sequences[sample])),
+                             id=sample, description="") for sample in samples]
 
-        # Filter sequences
-        for sample in samples:
-            sample_sequences[sample] = [sample_sequences[sample][i] for i in keep_sites]
+        # Write FASTA
+        with open(fasta_output, 'w') as output_file:
+            SeqIO.write(records, output_file, "fasta")
 
-        # Filter debug entries
-        kept_positions = {site_positions[i] for i in keep_sites}
-        debug_entries = [entry for entry in debug_entries if f"POS: {entry.split('POS: ')[1].split(',')[0]}" in map(str, kept_positions)]
-
-    # Build SeqRecords
-    records = [SeqRecord(Seq(''.join(sample_sequences[sample])),
-                         id=sample, description="") for sample in samples]
-
-    # Write FASTA
-    with open(fasta_output, 'w') as output_file:
-        SeqIO.write(records, output_file, "fasta")
-
-    # Total SNPs in final alignment
-    total_snps = len(records[0].seq) if records else 0
-
-    if not no_debug:
-        # Write full debug file
-        debug_file = fasta_output + ".debug.txt"
-        with open(debug_file, 'w') as df:
-            df.write(f"Total SNPs in final alignment: {total_snps}\n")
-            for line in debug_entries:
-                df.write(line + "\n")
-    else:
-        # Write a small summary file
-        summary_file = fasta_output + ".stats.txt"
-        with open(summary_file, 'w') as sf:
-            sf.write(f"Total SNPs in final alignment: {total_snps}\n")
-            sf.write(f"Number of samples: {len(samples)}\n")
-
-        # Also print to console
-        print(f"Total SNPs in final alignment: {total_snps}")
-        print(f"Number of samples: {len(samples)}")
+        # Write summary/debug header
+        if not no_debug:
+            debug_file.seek(0, 0)  # move to start if needed
+            debug_file.write(f"Total SNPs in final alignment: {total_snps}\n")
+            debug_file.close()
+        else:
+            summary_file.write(f"Total SNPs in final alignment: {total_snps}\n")
+            summary_file.write(f"Number of samples: {len(samples)}\n")
+            summary_file.close()
+            print(f"Total SNPs in final alignment: {total_snps}")
+            print(f"Number of samples: {len(samples)}")
 
 
 if __name__ == "__main__":
@@ -132,7 +120,8 @@ if __name__ == "__main__":
     parser.add_argument("--depth", type=int, default=10, help="Minimum depth threshold")
     parser.add_argument("--deletion", type=float, default=None,
                         help="Optional filter: drop sites with fewer than this proportion of non-missing calls")
-    parser.add_argument("--no-debug", action='store_true', help="Do not write full debug file; write only summary stats and print to console")
+    parser.add_argument("--no-debug", action='store_true',
+                        help="Do not write full debug file; write only summary stats and print to console")
 
     args = parser.parse_args()
 
