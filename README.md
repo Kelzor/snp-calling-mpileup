@@ -70,6 +70,7 @@ python snp-counts.py -i input.vcf -o output.tsv -d 10 -ad 5 -a 0.2 -homa 0.8 -s 
 | `--max_af`     |       | Float   | ❌ No    | `0.8`     | Maximum allele frequency threshold above which the alternate allele is chosen. |
 | `--depth`      |       | Integer | ❌ No    | `10`      | Minimum depth threshold required for a base call. |
 | `--deletion`   |       | Float   | ❌ No    | `None`    | Post-alignment filter: removes sites where fewer than this proportion of samples have data (non-`N`). Value must be between `0.1` and `1.0`. |
+| `--no-debug`   |       | Flag   | ❌ No    | `False`    | If set, the full debug file is not written. Instead, a small summary file with total SNPs and number of samples is generated, and the information is printed to the console. This is to save time for big alignments.|
 
 The debug file is a tab-delimited text file that logs decisions made for each variant and sample.
 Each line corresponds to one sample at one SNP site.
