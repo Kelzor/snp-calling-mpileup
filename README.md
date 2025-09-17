@@ -88,9 +88,9 @@ Missing genotypes (./.) are also represented as N.
 Convert a VCF to a SNP alignment, keeping only sites where at least 90% of samples are present (non-missing):  
 
 ```bash
-python MSAv8.py -i SNP5.13TLTpostMalt.vcf -o v8alignment9PD.fasta --min_af 0.1 --max_af 0.8 --depth 3 --deletion 0.9
+python MSA.py -i SNP5.13TLTpostMalt.vcf -o v8alignment9PD.fasta --min_af 0.1 --max_af 0.8 --depth 3 --deletion 0.9
 ```
 or
 ```bash
-python MSAv8.py -i SNP5.13TLTpostMalt.vcf -o v8alignment9PD.fasta --min_af 0.1 --max_af 0.8 --depth 3
+python MSA.py -i SNP5.13TLTpostMalt.vcf -o v8alignment9PD.fasta --min_af 0.1 --max_af 0.8 --depth 3
 ```
