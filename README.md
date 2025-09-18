@@ -54,7 +54,7 @@ python BED-OG-variable.py AFmergenormformat.vcf.gz -d 5 -a .10 -n 3 -v -b /data/
 ### Example Usage  
 
 ```bash
-python snp-counts.py -i input.vcf -o output.tsv -d 10 -ad 5 -a 0.2 -homa 0.8 -s sample1 sample2
+python snp-counts-tables.py -i input.vcf -o output.tsv -d 10 -ad 5 -a 0.2 -homa 0.8 -s sample1 sample2
 
 ```
 
