@@ -9,7 +9,7 @@ The produced vcf files have a record for every site in the reference genome. Thi
 
 Parses multivcf and outputs only variant sites as defined by user options.
 
-**Important**: if one sample passes the criteria, all sample records are kept, even if they do not themselves pass the filters. 
+**Important**: if one sample passes the criteria at a position, all sample records are kept at that position, even if they do not pass the filters. 
 
 May add functionality to convert these "failures" to Ns?
 
@@ -80,7 +80,7 @@ If `--deletion` is specified, only positions retained in the final filtered alig
 
 INDELs are skipped — only SNPs are included.
 Positions with insufficient depth (DP < --depth) or ambiguous allele frequency (--min_af < AF < --max_af) are called as N.
-Missing genotypes (./.) are also represented as N.
+Missing genotypes (./.) are also called as N.
 
 ---
 
@@ -91,7 +91,8 @@ Convert a VCF to a SNP alignment, keeping only sites where at least 90% of sampl
 ```bash
 python MSA.py -i SNP5.13TLTpostMalt.vcf -o v8alignment9PD.fasta --min_af 0.1 --max_af 0.8 --depth 3 --deletion 0.9
 ```
-or
+or keep all sites:
+
 ```bash
 python MSA.py -i SNP5.13TLTpostMalt.vcf -o v8alignment9PD.fasta --min_af 0.1 --max_af 0.8 --depth 3
 ```
