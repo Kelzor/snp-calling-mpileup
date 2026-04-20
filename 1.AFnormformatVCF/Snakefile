@@ -22,7 +22,6 @@ rule variant_call:
     shell:
         "bcftools mpileup -B --annotate FORMAT/AD,FORMAT/DP -f /data/stonelab/references/MTB_ancestor/MTB_ancestor.fasta {input.bam} | bcftools call --multiallelic-caller -Ov > {output}"
 
-# Define the rule to create output2.txt from input2.txt
 rule norm:
     input:
         "vcfs/{sample}-format.vcf"
@@ -47,7 +46,6 @@ rule merge:
      shell:
          "bcftools merge -m all -o {output} {input.vcf}"
 
- # Define the rule to create output2.txt from input2.txt
 rule calculate_AF:
      input:
          "merge-norm-format.vcf.gz"
